@@ -172,7 +172,7 @@ const start = async() => {
                     return h.response({
                         status: 'fail',
                         message: 'Terjadi kesalahan dalam melakukan prediksi',
-                    }).code(400);
+                    }).code(500);
                 }
             },
         });
