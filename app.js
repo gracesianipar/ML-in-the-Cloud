@@ -157,7 +157,7 @@ const start = async() => {
                         status: 'success',
                         message: 'Model is predicted successfully',
                         data: response.data,
-                    }).code(200);
+                    }).code(201);
 
                 } catch (error) {
                     console.error('Error:', error.message);
@@ -186,7 +186,7 @@ const start = async() => {
                         return h.response({
                             status: 'success',
                             data: [],
-                        }).code(200);
+                        }).code(201);
                     }
 
                     const histories = snapshot.docs.map((doc) => {
@@ -200,7 +200,7 @@ const start = async() => {
                     return h.response({
                         status: 'success',
                         data: histories,
-                    }).code(200);
+                    }).code(201);
                 } catch (error) {
                     console.error('Error fetching histories:', error.message);
                     return h.response({
