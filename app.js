@@ -111,35 +111,44 @@ const start = async() => {
                     if (image.hapi.filename === 'bad-request.jpg') {
                         return h.response({
                             status: 'fail',
-                            message: 'Bad request: Invalid image file',
+                            message: 'Terjadi kesalahan dalam melakukan prediksi',
                         }).code(400);
                     }
 
                     if (!image) {
                         return h.response({
                             status: 'fail',
-                            message: 'No image file uploaded',
+                            message: 'Terjadi kesalahan dalam melakukan prediksi',
                         }).code(400);
                     }
 
                     const mimeType = image.hapi.headers['content-type'];
+
                     if (!mimeType.startsWith('image/')) {
                         return h.response({
                             status: 'fail',
-                            message: 'Invalid image file uploaded',
+                            message: 'Terjadi kesalahan dalam melakukan prediksi',
                         }).code(400);
                     }
 
-                    const imageBuffer = await sharp(image._data).resize(224, 224).toBuffer();
+                    let imageBuffer;
+                    try {
+                        imageBuffer = await sharp(image._data).resize(224, 224).toBuffer();
+                    } catch (resizeError) {
+                        return h.response({
+                            status: 'fail',
+                            message: 'Terjadi kesalahan dalam melakukan prediksi',
+                        }).code(400);
+                    }
 
                     let predictionResult;
                     try {
                         predictionResult = await predictImage(imageBuffer, 0.5);
-                    } catch (error) {
+                    } catch (predictionError) {
                         return h.response({
                             status: 'fail',
-                            message: 'Terjadi kesalahan dalam memproses gambar',
-                        }).code(500);
+                            message: 'Terjadi kesalahan dalam melakukan prediksi',
+                        }).code(400);
                     }
 
                     const response = generateResponse(predictionResult.result === 'Cancer' ? 0.8 : 0.3, 0.5);
@@ -149,11 +158,12 @@ const start = async() => {
                         message: 'Model is predicted successfully',
                         data: response.data,
                     }).code(200);
+
                 } catch (error) {
                     console.error('Error:', error.message);
                     return h.response({
                         status: 'fail',
-                        message: error.message || 'Terjadi kesalahan dalam memproses gambar',
+                        message: 'Terjadi kesalahan dalam melakukan prediksi',
                     }).code(400);
                 }
             },
