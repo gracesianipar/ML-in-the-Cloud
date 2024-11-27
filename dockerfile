@@ -9,13 +9,14 @@ COPY package*.json ./
 
 # 4. Install dependensi aplikasi
 RUN npm install
-
-RUN apt-get update && apt-get install -y libglib2.0-0 libsm6 libxrender1 libxext6
+RUN npm rebuild @tensorflow/tfjs-node
+RUN apt-get update && apt-get install -y \
+    libglib2.0-0 libsm6 libxext6 libxrender-dev
 
 # 5. Salin semua file dari proyek Anda ke dalam container
 COPY . .
 
-# 6. Expose port 3000 (sesuai dengan aplikasi Anda)
+# 6. Expose port 8000
 EXPOSE 8080
 
 # 7. Tentukan perintah untuk menjalankan aplikasi
