@@ -11,7 +11,32 @@ const db = new Firestore({
 
 let model;
 
-// Load the model
+const generateResponse = (predictionValue, threshold = 0.7) => {
+    let result = "Non-cancer";
+    let suggestion = "Penyakit kanker tidak terdeteksi.";
+
+    console.log('Prediction Value:', predictionValue);
+    console.log('Threshold:', threshold);
+
+    if (predictionValue > threshold) {
+        result = "Cancer";
+        suggestion = "Segera periksa ke dokter!";
+    }
+
+    const response = {
+        status: "success",
+        message: "Model is predicted successfully",
+        data: {
+            id: uuidv4(),
+            result: result,
+            suggestion: suggestion,
+            createdAt: moment().toISOString(),
+        },
+    };
+
+    return response;
+};
+
 const loadModel = async() => {
     try {
         const modelUrl = 'https://storage.googleapis.com/submission-mlwithgglcloud-grace/submissions-model/model.json';
@@ -23,30 +48,31 @@ const loadModel = async() => {
     }
 };
 
-const predictImage = async(imageBuffer) => {
+const predictImage = async(imageBuffer, threshold = 0.7) => {
     try {
-        const tensor = tf.node.decodeImage(imageBuffer, 3);
-        console.log('Decoded tensor:', tensor);
+        const tensor = tf.node
+            .decodeJpeg(imageBuffer)
+            .resizeNearestNeighbor([224, 224])
+            .expandDims()
+            .toFloat();
 
-        const resizedTensor = tf.image.resizeBilinear(tensor, [224, 224]);
-        console.log('Resized tensor:', resizedTensor);
+        const prediction = model.predict(tensor);
+        const predictionValue = await prediction.data();
 
-        const input = resizedTensor.expandDims(0).toFloat().div(tf.scalar(255));
-        console.log('Input tensor shape:', input.shape);
+        let result;
+        let suggestion;
 
-        const predictions = await model.predict(input);
-        console.log('Predictions:', predictions);
-
-        const predictionValue = predictions.dataSync()[0];
-        console.log('Prediction Value:', predictionValue);
-
-        const result = predictionValue > 0.5 ? 'Cancer' : 'Non-cancer';
-        const suggestion = result === 'Cancer' ? 'Segera periksa ke dokter!' : 'Penyakit kanker tidak terdeteksi.';
+        if (predictionValue[0] >= threshold) {
+            result = 'Cancer';
+            suggestion = 'Segera periksa ke dokter!';
+        } else {
+            result = 'Non-cancer';
+            suggestion = 'Anda sehat!';
+        }
 
         return { result, suggestion };
     } catch (error) {
-        console.error('Error during prediction:', error.message);
-        return { result: 'Error during prediction', suggestion: 'Terjadi kesalahan dalam melakukan prediksi' };
+        throw new Error('Terjadi kesalahan dalam memproses gambar');
     }
 };
 
@@ -76,16 +102,19 @@ const start = async() => {
                 },
             },
             handler: async(request, h) => {
-                const { image } = request.payload;
-
-                if (!image) {
-                    return h.response({
-                        status: 'fail',
-                        message: 'No image file uploaded',
-                    }).code(400);
-                }
-
                 try {
+                    console.log('Headers:', request.headers);
+                    console.log('Payload:', request.payload);
+
+                    const { image } = request.payload;
+
+                    if (!image) {
+                        return h.response({
+                            status: 'fail',
+                            message: 'No image file uploaded',
+                        }).code(400);
+                    }
+
                     const mimeType = image.hapi.headers['content-type'];
                     if (!mimeType.startsWith('image/')) {
                         return h.response({
@@ -94,40 +123,31 @@ const start = async() => {
                         }).code(400);
                     }
 
-                    const imageBuffer = await sharp(image._data)
-                        .resize(224, 224)
-                        .toBuffer();
+                    const imageBuffer = await sharp(image._data).resize(224, 224).toBuffer();
 
-                    const predictionResult = await predictImage(imageBuffer);
+                    const predictionResult = await predictImage(imageBuffer, 0.5);
+                    console.log('Prediction Result:', predictionResult);
 
-                    if (predictionResult.result === 'Error during prediction') {
+                    if (predictionResult.result === 'Error') {
                         return h.response({
                             status: 'fail',
                             message: predictionResult.suggestion,
                         }).code(500);
                     }
 
-                    const predictionId = uuidv4();
-
-                    const response = {
-                        id: predictionId,
-                        result: predictionResult.result,
-                        suggestion: predictionResult.suggestion,
-                        createdAt: moment().toISOString(),
-                    };
-
-                    await db.collection('predictions').doc(predictionId).set(response);
+                    const response = generateResponse(predictionResult.result === 'Cancer' ? 0.8 : 0.3, 0.5);
 
                     return h.response({
                         status: 'success',
-                        data: response,
+                        message: 'Model is predicted successfully',
+                        data: response.data,
                     }).code(200);
                 } catch (error) {
-                    console.error('Prediction error:', error.message);
+                    console.error('Error:', error.message);
                     return h.response({
                         status: 'fail',
-                        message: 'Terjadi kesalahan dalam melakukan prediksi',
-                    }).code(500);
+                        message: error.message,
+                    }).code(400);
                 }
             },
         });
@@ -148,9 +168,6 @@ const start = async() => {
 
                     const histories = snapshot.docs.map((doc) => {
                         const data = doc.data();
-                        if (data.createdAt && data.createdAt._seconds) {
-                            data.createdAt = new Date(data.createdAt._seconds * 1000).toISOString();
-                        }
                         return {
                             id: doc.id,
                             history: data,
