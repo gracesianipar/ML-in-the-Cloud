@@ -161,17 +161,20 @@ const start = async() => {
 
                 } catch (error) {
                     console.error('Error:', error.message);
+
                     if (error.message.includes("Payload content length greater")) {
                         return h.response({
                             status: 'fail',
-                            message: 'Payload content length greater than maximum allowed: 1000000',
-                        }).code(400);
+                            message: 'Payload content length greater than maximum allowed: 1000000'
+                        }).code(413);
                     }
+
                     return h.response({
                         status: 'fail',
                         message: 'Terjadi kesalahan dalam melakukan prediksi',
                     }).code(400);
                 }
+
             },
         });
 
@@ -200,7 +203,7 @@ const start = async() => {
                     return h.response({
                         status: 'success',
                         data: histories,
-                    }).code(201);
+                    }).code(200);
                 } catch (error) {
                     console.error('Error fetching histories:', error.message);
                     return h.response({
