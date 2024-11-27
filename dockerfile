@@ -19,4 +19,4 @@ COPY . .
 EXPOSE 8080
 
 # 7. Tentukan perintah untuk menjalankan aplikasi
-CMD ["node", "server.js"]
+CMD ["node", "app.js"]
