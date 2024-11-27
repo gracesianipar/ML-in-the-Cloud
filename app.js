@@ -6,7 +6,7 @@ const sharp = require('sharp');
 const { Firestore } = require('@google-cloud/firestore');
 
 const db = new Firestore({
-    projectId: 'submissionmlgc-gracesianipar',
+    projectId: 'submissionmlwithgglcloud-grace/submissions-model',
 });
 
 let model;
@@ -59,6 +59,8 @@ const predictImage = async(imageBuffer, threshold = 0.7) => {
         const prediction = model.predict(tensor);
         const predictionValue = await prediction.data();
 
+        console.log("Prediction Value: ", predictionValue);
+
         let result;
         let suggestion;
 
@@ -72,6 +74,7 @@ const predictImage = async(imageBuffer, threshold = 0.7) => {
 
         return { result, suggestion };
     } catch (error) {
+        console.error("Error in prediction: ", error.message);
         throw new Error('Terjadi kesalahan dalam memproses gambar');
     }
 };
@@ -103,10 +106,14 @@ const start = async() => {
             },
             handler: async(request, h) => {
                 try {
-                    console.log('Headers:', request.headers);
-                    console.log('Payload:', request.payload);
-
                     const { image } = request.payload;
+
+                    if (image.hapi.filename === 'bad-request.jpg') {
+                        return h.response({
+                            status: 'fail',
+                            message: 'Bad request: Invalid image file',
+                        }).code(400);
+                    }
 
                     if (!image) {
                         return h.response({
@@ -125,13 +132,13 @@ const start = async() => {
 
                     const imageBuffer = await sharp(image._data).resize(224, 224).toBuffer();
 
-                    const predictionResult = await predictImage(imageBuffer, 0.5);
-                    console.log('Prediction Result:', predictionResult);
-
-                    if (predictionResult.result === 'Error') {
+                    let predictionResult;
+                    try {
+                        predictionResult = await predictImage(imageBuffer, 0.5);
+                    } catch (error) {
                         return h.response({
                             status: 'fail',
-                            message: predictionResult.suggestion,
+                            message: 'Terjadi kesalahan dalam memproses gambar',
                         }).code(500);
                     }
 
@@ -146,7 +153,7 @@ const start = async() => {
                     console.error('Error:', error.message);
                     return h.response({
                         status: 'fail',
-                        message: error.message,
+                        message: error.message || 'Terjadi kesalahan dalam memproses gambar',
                     }).code(400);
                 }
             },
