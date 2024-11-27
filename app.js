@@ -3,40 +3,50 @@ const tf = require('@tensorflow/tfjs-node');
 const { v4: uuidv4 } = require('uuid');
 const moment = require('moment');
 const sharp = require('sharp');
-const path = require('path');
 const { Firestore } = require('@google-cloud/firestore');
 
 const db = new Firestore({
     projectId: 'submissionmlgc-gracesianipar',
 });
 
-
 let model;
 
 // Load the model
 const loadModel = async() => {
     try {
-        const modelPath = path.join(__dirname, 'models', 'model.json');
-        model = await tf.loadGraphModel(`file://${modelPath}`);
+        const modelUrl = 'https://storage.googleapis.com/submission-mlwithgglcloud-grace/submissions-model/model.json';
+        model = await tf.loadGraphModel(modelUrl);
         console.log('Model loaded successfully');
     } catch (error) {
         console.error('Error loading model:', error.message);
-        process.exit(1); // Exit process if model fails to load
+        process.exit(1);
     }
 };
 
 const predictImage = async(imageBuffer) => {
     try {
         const tensor = tf.node.decodeImage(imageBuffer, 3);
+        console.log('Decoded tensor:', tensor);
+
         const resizedTensor = tf.image.resizeBilinear(tensor, [224, 224]);
+        console.log('Resized tensor:', resizedTensor);
+
         const input = resizedTensor.expandDims(0).toFloat().div(tf.scalar(255));
+        console.log('Input tensor shape:', input.shape);
 
         const predictions = await model.predict(input);
-        const result = predictions.dataSync()[0] > 0.5 ? 'Cancer' : 'Non-cancer';
-        return result;
+        console.log('Predictions:', predictions);
+
+        const predictionValue = predictions.dataSync()[0];
+        console.log('Prediction Value:', predictionValue);
+
+        const result = predictionValue > 0.5 ? 'Cancer' : 'Non-cancer';
+        const suggestion = result === 'Cancer' ? 'Segera periksa ke dokter!' : 'Penyakit kanker tidak terdeteksi.';
+
+        return { result, suggestion };
     } catch (error) {
         console.error('Error during prediction:', error.message);
-        return 'Error during prediction';
+        return { result: 'Error during prediction', suggestion: 'Terjadi kesalahan dalam melakukan prediksi' };
     }
 };
 
@@ -52,7 +62,6 @@ const server = Hapi.server({
 
 const start = async() => {
     try {
-        // Load model before starting server
         await loadModel();
 
         server.route({
@@ -60,7 +69,7 @@ const start = async() => {
             path: '/predict',
             options: {
                 payload: {
-                    maxBytes: 1000000, // 1MB limit for the uploaded file
+                    maxBytes: 1000000,
                     parse: true,
                     multipart: true,
                     output: 'stream',
@@ -89,13 +98,21 @@ const start = async() => {
                         .resize(224, 224)
                         .toBuffer();
 
-                    const result = await predictImage(imageBuffer);
+                    const predictionResult = await predictImage(imageBuffer);
+
+                    if (predictionResult.result === 'Error during prediction') {
+                        return h.response({
+                            status: 'fail',
+                            message: predictionResult.suggestion,
+                        }).code(500);
+                    }
+
                     const predictionId = uuidv4();
 
                     const response = {
                         id: predictionId,
-                        result,
-                        suggestion: result === 'Cancer' ? 'Segera periksa ke dokter!' : 'Penyakit kanker tidak terdeteksi.',
+                        result: predictionResult.result,
+                        suggestion: predictionResult.suggestion,
                         createdAt: moment().toISOString(),
                     };
 
