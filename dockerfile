@@ -1,32 +1,20 @@
-# 1. Gunakan base image Node.js versi Linux
-FROM node:18-slim
+# 1. Gunakan base image Node.js
+FROM node:16
 
-# 2. Instal library yang dibutuhkan
-RUN apt-get update && apt-get install -y \
-    curl \
-    libglib2.0-0 \
-    libsm6 \
-    libxrender1 \
-    libxext6 \
-    && rm -rf /var/lib/apt/lists/*
-
-# 3. Tentukan direktori kerja
+# 2. Tentukan direktori kerja di dalam container
 WORKDIR /app
 
-# 4. Salin file package.json dan package-lock.json
+# 3. Salin file package.json dan package-lock.json
 COPY package*.json ./
 
-# 5. Install dependensi secara eksplisit
-RUN npm install --build-from-source
+# 4. Install dependensi aplikasi
+RUN npm install
 
-# 6. Salin seluruh project ke container
+# 5. Salin semua file dari proyek Anda ke dalam container
 COPY . .
 
-# 7. Verifikasi file di dalam container
-RUN ls -R /app
-
-# 8. Expose port untuk container
+# 6. Expose port 3000 (sesuai dengan aplikasi Anda)
 EXPOSE 8080
 
-# 9. Jalankan aplikasi
-CMD ["node", "app.js"]
+# 7. Tentukan perintah untuk menjalankan aplikasi
+CMD ["node", "server.js"]
