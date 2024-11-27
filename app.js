@@ -6,7 +6,7 @@ const sharp = require('sharp');
 const { Firestore } = require('@google-cloud/firestore');
 
 const db = new Firestore({
-    projectId: 'submissionmlwithgglcloud-grace/submissions-model',
+    projectId: 'submissionmlgc-gracesianipar',
 });
 
 let model;
@@ -161,6 +161,12 @@ const start = async() => {
 
                 } catch (error) {
                     console.error('Error:', error.message);
+                    if (error.message.includes("Payload content length greater")) {
+                        return h.response({
+                            status: 'fail',
+                            message: 'Payload content length greater than maximum allowed: 1000000',
+                        }).code(400);
+                    }
                     return h.response({
                         status: 'fail',
                         message: 'Terjadi kesalahan dalam melakukan prediksi',
