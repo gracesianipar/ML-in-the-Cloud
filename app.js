@@ -165,7 +165,7 @@ const start = async() => {
                     if (error.message.includes("Payload content length greater")) {
                         return h.response({
                             status: 'fail',
-                            message: 'Payload content length greater than maximum allowed: 1000000'
+                            message: 'Payload content length greater than maximum allowed: 1000000.'
                         }).code(413);
                     }
 
@@ -174,7 +174,6 @@ const start = async() => {
                         message: 'Terjadi kesalahan dalam melakukan prediksi',
                     }).code(400);
                 }
-
             },
         });
 
